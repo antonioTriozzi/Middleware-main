@@ -1,6 +1,5 @@
 package it.univaq.testMiddleware.controllers;
 
-import it.univaq.testMiddleware.DTO.*;
 import it.univaq.testMiddleware.models.*;
 import it.univaq.testMiddleware.repositories.CondominioRepository;
 import it.univaq.testMiddleware.repositories.DispositivoRepository;
@@ -13,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/external")
@@ -38,6 +39,8 @@ public class ExternalController {
     @PostMapping("/condominio/{id}/dispositivo/{idDispositivo}")
     public ResponseEntity<?> fetchExternalDataPost(@PathVariable("id") Long condominioId,
                                                    @PathVariable("idDispositivo") Long dispositivoId) {
+        Long cid = Objects.requireNonNull(condominioId, "id");
+        Long did = Objects.requireNonNull(dispositivoId, "idDispositivo");
         // Recupera l'utente autenticato
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userService.findByUsername(username);
@@ -45,15 +48,15 @@ public class ExternalController {
             return ResponseEntity.status(404).body("Utente non trovato");
         }
         // Recupera il condominio
-        Condominio condominio = condominioRepository.findById(condominioId)
+        Condominio condominio = condominioRepository.findById(cid)
                 .orElse(null);
         if (condominio == null) {
             return ResponseEntity.status(404).body("Condominio non trovato");
         }
         // Recupera il dispositivo e verifica che appartenga al condominio
-        Dispositivo dispositivo = dispositivoRepository.findById(dispositivoId)
+        Dispositivo dispositivo = dispositivoRepository.findById(did)
                 .orElse(null);
-        if (dispositivo == null || !dispositivo.getCondominio().getIdCondominio().equals(condominioId)) {
+        if (dispositivo == null || !dispositivo.getCondominio().getIdCondominio().equals(cid)) {
             return ResponseEntity.status(404).body("Dispositivo non trovato per il condominio specificato");
         }
 
@@ -75,6 +78,8 @@ public class ExternalController {
     @GetMapping("/condominio/{id}/dispositivo/{idDispositivo}")
     public ResponseEntity<?> fetchExternalDataGet(@PathVariable("id") Long condominioId,
                                                   @PathVariable("idDispositivo") Long dispositivoId) {
+        Long cid = Objects.requireNonNull(condominioId, "id");
+        Long did = Objects.requireNonNull(dispositivoId, "idDispositivo");
         // Recupera l'utente autenticato
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userService.findByUsername(username);
@@ -82,15 +87,15 @@ public class ExternalController {
             return ResponseEntity.status(404).body("Utente non trovato");
         }
         // Recupera il condominio
-        Condominio condominio = condominioRepository.findById(condominioId)
+        Condominio condominio = condominioRepository.findById(cid)
                 .orElse(null);
         if (condominio == null) {
             return ResponseEntity.status(404).body("Condominio non trovato");
         }
         // Recupera il dispositivo e verifica che appartenga al condominio
-        Dispositivo dispositivo = dispositivoRepository.findById(dispositivoId)
+        Dispositivo dispositivo = dispositivoRepository.findById(did)
                 .orElse(null);
-        if (dispositivo == null || !dispositivo.getCondominio().getIdCondominio().equals(condominioId)) {
+        if (dispositivo == null || !dispositivo.getCondominio().getIdCondominio().equals(cid)) {
             return ResponseEntity.status(404).body("Dispositivo non trovato per il condominio specificato");
         }
 

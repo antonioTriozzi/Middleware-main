@@ -18,6 +18,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Spinge i nuovi client verso il DB dell'app web (batch periodico, outbox {@link UserSyncOutboxService#EVENT_WEB_CLIENT_UPSERT}).
@@ -103,12 +104,13 @@ public class WebAppUserSyncScheduler {
         body.set("clients", clients);
 
         try {
-            String json = objectMapper.writeValueAsString(body);
-            RestClient client = RestClient.builder().baseUrl(baseUrl).build();
+            String json = Objects.requireNonNull(objectMapper.writeValueAsString(body), "json");
+            String syncToken = Objects.requireNonNull(secret, "secret");
+            RestClient client = RestClient.builder().baseUrl(Objects.requireNonNull(baseUrl, "baseUrl")).build();
             client.post()
-                    .uri(path)
-                    .header("X-Middleware-Sync-Token", secret)
-                    .contentType(MediaType.APPLICATION_JSON)
+                    .uri(Objects.requireNonNull(path, "path"))
+                    .header("X-Middleware-Sync-Token", syncToken)
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                     .body(json)
                     .retrieve()
                     .toBodilessEntity();

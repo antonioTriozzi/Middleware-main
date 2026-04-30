@@ -2,7 +2,6 @@ package it.univaq.testMiddleware.controllers;
 
 import it.univaq.testMiddleware.models.DatoSensore;
 import it.univaq.testMiddleware.models.ParametroDispositivo;
-import it.univaq.testMiddleware.models.ParametroDispositivo;
 import it.univaq.testMiddleware.repositories.DatoSensoreRepository;
 import it.univaq.testMiddleware.repositories.ParametroDispositivoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Random;
 

@@ -1,7 +1,6 @@
 package it.univaq.testMiddleware.DTO;
 
 import lombok.Data;
-import java.util.Date;
 
 // DTO per l'utente (amministratore)
 @Data

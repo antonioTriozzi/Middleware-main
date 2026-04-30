@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -70,7 +71,7 @@ public class ConsumiIngestService {
                 continue;
             }
 
-            Condominio condominio = condominioRepository.findById(it.getBuildingId())
+            Condominio condominio = condominioRepository.findById(Objects.requireNonNull(it.getBuildingId(), "buildingId"))
                     .orElseGet(() -> createCondominioFromJson(it, warnings));
             enrichCondominioFromJson(condominio, it);
 
@@ -197,7 +198,7 @@ public class ConsumiIngestService {
             // Se non esiste per email, prova a usare client_id SOLO se presente e compatibile:
             // - se l'utente esiste e non ha email o ha la stessa email, lo normalizziamo.
             if (it.getClientId() != null) {
-                Optional<User> byId = userRepository.findById(it.getClientId());
+                Optional<User> byId = userRepository.findById(Objects.requireNonNull(it.getClientId(), "clientId"));
                 if (byId.isPresent()) {
                     User u = byId.get();
                     String existingEmail = u.getEmail() != null ? u.getEmail().trim().toLowerCase() : "";
@@ -275,7 +276,7 @@ public class ConsumiIngestService {
 
         // Fallback: se manca email ma c'è client_id, usa quello
         if (it.getClientId() != null) {
-            Optional<User> byId = userRepository.findById(it.getClientId());
+            Optional<User> byId = userRepository.findById(Objects.requireNonNull(it.getClientId(), "clientId"));
             if (byId.isPresent()) {
                 return byId;
             }
@@ -291,7 +292,7 @@ public class ConsumiIngestService {
                 ? dispositivoRepository.findByAssetIdAndCondominio_IdCondominio(it.getAssetId(), condominio.getIdCondominio())
                 : Optional.empty();
         if (byAsset.isPresent()) {
-            Dispositivo d = byAsset.get();
+            Dispositivo d = Objects.requireNonNull(byAsset.get(), "dispositivo");
             updateDeviceFields(d, it, owner);
             return dispositivoRepository.save(d);
         }
@@ -300,7 +301,7 @@ public class ConsumiIngestService {
         if (it.getDeviceId() != null && !it.getDeviceId().isBlank()) {
             Optional<Dispositivo> byExt = dispositivoRepository.findByExternalDeviceIdAndCondominio_IdCondominio(it.getDeviceId().trim(), condominio.getIdCondominio());
             if (byExt.isPresent()) {
-                Dispositivo d = byExt.get();
+                Dispositivo d = Objects.requireNonNull(byExt.get(), "dispositivo");
                 updateDeviceFields(d, it, owner);
                 return dispositivoRepository.save(d);
             }

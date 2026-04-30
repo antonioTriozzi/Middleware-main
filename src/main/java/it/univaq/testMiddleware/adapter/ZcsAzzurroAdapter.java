@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class ZcsAzzurroAdapter implements ExternalDataAdapter {
@@ -41,6 +42,7 @@ public class ZcsAzzurroAdapter implements ExternalDataAdapter {
 
     @Override
     @Transactional
+    @SuppressWarnings("unchecked")
     public ExternalDataResponse fetchAndMapData(Condominio condominio, Dispositivo dispositivo, User user) {
         // Costruisci la richiesta all’API esterna
         String externalApiUrl = "https://third.zcsazzurroportal.com:19003/";
@@ -106,7 +108,7 @@ public class ZcsAzzurroAdapter implements ExternalDataAdapter {
 
         // Se necessario, puoi aggiungere altri processi per altri campi come "thingFind" (se intendi salvarlo come parametro)
 
-        dispositivoRepository.save(dispositivo);
+        dispositivoRepository.save(Objects.requireNonNull(dispositivo, "dispositivo"));
 
         // Costruisci il DTO di risposta
         ExternalDataResponse responseDto = new ExternalDataResponse();

@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -147,6 +148,7 @@ public class DispositivoController {
     @GetMapping("/condomini/{idCondominio}/dispositivi")
     @Transactional
     public ResponseEntity<CondominioDispositiviResponse> getDispositiviByCondominio(@PathVariable Long idCondominio) {
+        Objects.requireNonNull(idCondominio, "idCondominio");
         Optional<Condominio> condOptional = condominioRepository.findById(idCondominio);
         if (!condOptional.isPresent()) {
             return ResponseEntity.notFound().build();
@@ -226,6 +228,7 @@ public class DispositivoController {
     @PostMapping("/condomini/{idCondominio}/dispositivi")
     @Transactional
     public ResponseEntity<Dispositivo> addDispositivo(@PathVariable Long idCondominio, @RequestBody DispositivoInputDTO input) {
+        Objects.requireNonNull(idCondominio, "idCondominio");
         Optional<Condominio> condOptional = condominioRepository.findById(idCondominio);
         if (!condOptional.isPresent()) {
             return ResponseEntity.notFound().build();
@@ -267,6 +270,7 @@ public class DispositivoController {
     @GetMapping("/dispositivi/{idDispositivo}")
     @Transactional
     public ResponseEntity<DispositivoDTO> getDispositivo(@PathVariable Long idDispositivo) {
+        Objects.requireNonNull(idDispositivo, "idDispositivo");
         Optional<Dispositivo> deviceOpt = dispositivoRepository.findById(idDispositivo);
         if (!deviceOpt.isPresent()) {
             return ResponseEntity.notFound().build();
@@ -285,6 +289,7 @@ public class DispositivoController {
     @PutMapping("/dispositivi/{idDispositivo}")
     @Transactional
     public ResponseEntity<Dispositivo> updateDispositivo(@PathVariable Long idDispositivo, @RequestBody DispositivoInputDTO input) {
+        Objects.requireNonNull(idDispositivo, "idDispositivo");
         Optional<Dispositivo> dispOpt = dispositivoRepository.findById(idDispositivo);
         if (!dispOpt.isPresent()) {
             return ResponseEntity.notFound().build();
@@ -328,11 +333,13 @@ public class DispositivoController {
     @DeleteMapping("/dispositivi/{idDispositivo}")
     @Transactional
     public ResponseEntity<Void> deleteDispositivo(@PathVariable Long idDispositivo) {
+        Objects.requireNonNull(idDispositivo, "idDispositivo");
         Optional<Dispositivo> dispOpt = dispositivoRepository.findById(idDispositivo);
         if (!dispOpt.isPresent()) {
             return ResponseEntity.notFound().build();
         }
-        dispositivoRepository.delete(dispOpt.get());
+        Dispositivo toDelete = Objects.requireNonNull(dispOpt.get(), "dispositivo");
+        dispositivoRepository.delete(toDelete);
         return ResponseEntity.noContent().build();
     }
 
@@ -343,6 +350,7 @@ public class DispositivoController {
     @DeleteMapping("/parametri/{idParametro}")
     @Transactional
     public ResponseEntity<Void> deleteParametro(@PathVariable Long idParametro) {
+        Objects.requireNonNull(idParametro, "idParametro");
         Optional<ParametroDispositivo> parametroOpt = parametroRepository.findById(idParametro);
         if (!parametroOpt.isPresent()) {
             return ResponseEntity.notFound().build();
@@ -356,7 +364,7 @@ public class DispositivoController {
         }
 
         // Ora elimina il parametro
-        parametroRepository.delete(parametro);
+        parametroRepository.delete(Objects.requireNonNull(parametro, "parametro"));
         return ResponseEntity.noContent().build();
     }
 

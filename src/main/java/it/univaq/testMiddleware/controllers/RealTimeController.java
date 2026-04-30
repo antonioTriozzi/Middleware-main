@@ -46,6 +46,8 @@ public class RealTimeController {
     @GetMapping("/condominio/{id}/dispositivo/{idDispositivo}")
     public ResponseEntity<?> getRealtimeData(@PathVariable("id") Long condominioId,
                                              @PathVariable("idDispositivo") Long dispositivoId) {
+        Long cid = Objects.requireNonNull(condominioId, "id");
+        Long did = Objects.requireNonNull(dispositivoId, "idDispositivo");
         // Recupera l'utente autenticato
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userService.findByUsername(username);
@@ -54,15 +56,15 @@ public class RealTimeController {
         }
 
         // Recupera il condominio
-        Optional<Condominio> condOpt = condominioRepository.findById(condominioId);
+        Optional<Condominio> condOpt = condominioRepository.findById(cid);
         if (!condOpt.isPresent()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Condominio non trovato");
         }
         Condominio condominio = condOpt.get();
 
         // Recupera il dispositivo e verifica che appartenga al condominio
-        Optional<Dispositivo> dispOpt = dispositivoRepository.findById(dispositivoId);
-        if (!dispOpt.isPresent() || !dispOpt.get().getCondominio().getIdCondominio().equals(condominioId)) {
+        Optional<Dispositivo> dispOpt = dispositivoRepository.findById(did);
+        if (!dispOpt.isPresent() || !dispOpt.get().getCondominio().getIdCondominio().equals(cid)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Dispositivo non trovato per il condominio specificato");
         }
@@ -191,6 +193,10 @@ public class RealTimeController {
                 datoToUse = datoSensoreRepository.save(newDato);
             } else {
                 datoToUse = lastDato;
+            }
+
+            if (datoToUse == null) {
+                continue;
             }
 
             ParametroRealtimeDTO dto = new ParametroRealtimeDTO();

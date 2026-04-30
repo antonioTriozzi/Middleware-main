@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,14 +21,12 @@ import java.security.Key;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final UserService userService;
     private final TokenService tokenService;
 
     // Chiave segreta (almeno 256 bit)
     private static final String SECRET_KEY = "01234567890123456789012345678901";
 
-    public JwtAuthenticationFilter(UserService userService, TokenService tokenService) {
-        this.userService = userService;
+    public JwtAuthenticationFilter(TokenService tokenService) {
         this.tokenService = tokenService;
     }
 
@@ -48,10 +47,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain chain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain) throws ServletException, IOException {
 
         // 1. Controlliamo la presenza dell'header Authorization
         String authHeader = request.getHeader("Authorization");
@@ -98,7 +95,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 5. Se arriviamo qui, il token non è scaduto: estraggo lo username
         String username = claims.getSubject();
 
-        // 6. Imposto l’autenticazione se non già presente
+        // 6. Imposto l'autenticazione se non gia presente
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(username, null, null);

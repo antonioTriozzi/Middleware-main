@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -81,11 +82,11 @@ public class UserDataService {
             }
         }
 
-        user = userRepository.save(user);
+        user = userRepository.save(Objects.requireNonNull(user, "user"));
 
         if (isNew) {
             try {
-                userSyncOutboxService.enqueue(user, UserSyncOutboxService.EVENT_WEB_CLIENT_UPSERT);
+                userSyncOutboxService.enqueue(Objects.requireNonNull(user, "user"), UserSyncOutboxService.EVENT_WEB_CLIENT_UPSERT);
             } catch (Exception ignored) {
                 // non bloccare salvataggio
             }

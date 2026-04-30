@@ -51,7 +51,8 @@ public class CondominioController {
             Map<Long, Condominio> unique = new LinkedHashMap<>();
 
             if (user.getIdCondominio() != null) {
-                condominioRepository.findById(user.getIdCondominio())
+                Long cid = user.getIdCondominio();
+                condominioRepository.findById(Objects.requireNonNull(cid, "idCondominio"))
                         .ifPresent(c -> unique.put(c.getIdCondominio(), c));
             }
 
@@ -82,6 +83,7 @@ public class CondominioController {
     @GetMapping("/condominio/{id}")
     @Transactional
     public ResponseEntity<?> getCondominioDetails(@PathVariable("id") Long id) {
+        Objects.requireNonNull(id, "id");
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userService.findByUsername(username);
         if (user == null) {
@@ -114,6 +116,8 @@ public class CondominioController {
     @Transactional
     public ResponseEntity<?> getDispositivoDetails(@PathVariable("id") Long id,
                                                    @PathVariable("idDispositivo") Long idDispositivo) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(idDispositivo, "idDispositivo");
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userService.findByUsername(username);
         if (user == null) {
@@ -158,6 +162,9 @@ public class CondominioController {
                                                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) String startDateStr,
                                                     @RequestParam(value = "endDate", required = false)
                                                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) String endDateStr) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(idDispositivo, "idDispositivo");
+        Objects.requireNonNull(idParametro, "idParametro");
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userService.findByUsername(username);
         if (user == null) {
