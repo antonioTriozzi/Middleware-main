@@ -24,6 +24,13 @@ public class ParametroDispositivo {
     @Column(name = "unita_misura")
     private String unitaMisura;
 
+    // KNX metadata (se applicabile)
+    @Column(name = "group_address")
+    private String groupAddress;
+
+    @Column(name = "dpt")
+    private String dpt;
+
     // Nuove colonne per il range di valori (ipotizziamo valori numerici come Double)
     @Column(name = "val_min")
     private Double valMin;

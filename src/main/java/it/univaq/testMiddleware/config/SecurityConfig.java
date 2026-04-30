@@ -33,7 +33,14 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/auth/login", "/auth/register").permitAll()
+                        .requestMatchers(
+                                "/",
+                                "/health",
+                                "/auth/login",
+                                "/auth/register",
+                                "/auth/otp/request",
+                                "/auth/otp/verify"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 // Aggiungi gestione delle eccezioni

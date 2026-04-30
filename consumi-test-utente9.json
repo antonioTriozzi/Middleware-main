@@ -1,0 +1,24 @@
+[
+    {
+      "measure": "power",
+      "value": 1500,
+      "unit": "W",
+      "device_id": "SN-SE-99999999",
+      "building_id": 1,
+      "asset_id": 8,
+      "asset_name": "modbus seriale",
+      "client_id": 9,
+      "client_mail": "giov.bianchi@example.com"
+    },
+    {
+      "measure": "active_energy",
+      "value": 2000,
+      "unit": "kWh",
+      "device_id": "SN-SE-99999999",
+      "building_id": 1,
+      "asset_id": 8,
+      "asset_name": "modbus seriale",
+      "client_id": 9,
+      "client_mail": "giov.bianchi@example.com"
+    }
+  ]

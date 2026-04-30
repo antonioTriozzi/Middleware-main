@@ -1,0 +1,35 @@
+[
+  {
+    "measure": "ENERGY WH",
+    "value": 12345000,
+    "unit": "Wh",
+    "device_id": "MBUS-87654321",
+    "building_id": 1,
+    "asset_id": 5,
+    "asset_name": "pompa di calore",
+    "client_mail": "mario.rossi@example.com",
+    "category": "Energia"
+  },
+  {
+    "measure": "POWER W",
+    "value": 1500,
+    "unit": "W",
+    "device_id": "MBUS-87654321",
+    "building_id": 1,
+    "asset_id": 5,
+    "asset_name": "pompa di calore",
+    "client_mail": "mario.rossi@example.com",
+    "category": "Energia"
+  },
+  {
+    "measure": "FLOW TEMPERATURE",
+    "value": 55,
+    "unit": "C",
+    "device_id": "MBUS-87654321",
+    "building_id": 1,
+    "asset_id": 5,
+    "asset_name": "pompa di calore",
+    "client_mail": "mario.rossi@example.com",
+    "category": "Calore"
+  }
+]

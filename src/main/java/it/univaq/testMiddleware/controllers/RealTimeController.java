@@ -7,7 +7,9 @@ import it.univaq.testMiddleware.repositories.DispositivoRepository;
 import it.univaq.testMiddleware.repositories.DatoSensoreRepository;
 import it.univaq.testMiddleware.services.UserService;
 import jakarta.transaction.Transactional;
+import it.univaq.testMiddleware.services.SensorGaugeDefaults;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -32,6 +34,13 @@ public class RealTimeController {
 
     @Autowired
     private UserService userService;
+
+    /**
+     * Se true, mantiene il vecchio comportamento demo: genera variazioni casuali e scrive nuovi {@link DatoSensore}.
+     * Default false: l'endpoint restituisce solo l'ultimo valore già ingested (JSON → DB) senza modificarlo.
+     */
+    @Value("${app.realtime.simulate-readings:false}")
+    private boolean simulateReadings;
 
     @Transactional
     @GetMapping("/condominio/{id}/dispositivo/{idDispositivo}")
@@ -64,78 +73,9 @@ public class RealTimeController {
         CondominioDTO condominioDTO = mapToCondominioDTO(condominio);
         UserDTO userDTO = mapToUserDTO(user);
 
-        // Per ogni parametro del dispositivo, recupera l'ultimo dato e genera (o riutilizza) il nuovo valore
-        List<Map<String, Object>> parametriList = new ArrayList<>();
-        Random random = new Random();
-
-        if (dispositivo.getParametriDispositivo() != null) {
-            for (ParametroDispositivo parametro : dispositivo.getParametriDispositivo()) {
-                Map<String, Object> paramData = new HashMap<>();
-                ParametroDTO parametroDTO = mapToParametroDTO(parametro);
-
-                double min = parametro.getValMin() != null ? parametro.getValMin() : 0.0;
-                double max = parametro.getValMax() != null ? parametro.getValMax() : 100.0;
-                double maxDelta = parametro.getMaxDelta() != null ? parametro.getMaxDelta() : (max - min) * 0.1; // default: 10% del range
-
-                Instant now = Instant.now();
-
-                // Recupera l'ultimo dato sensore per questo parametro
-                DatoSensore lastDato = datoSensoreRepository.findFirstByParametroOrderByTimestampDesc(parametro);
-                boolean generateNewData = true;
-                double baseValue;
-
-                if (lastDato != null) {
-                    Duration diff = Duration.between(lastDato.getTimestamp(), now);
-                    if (diff.toMinutes() < 10) {
-                        // Se l'ultimo dato è stato registrato da meno di 10 minuti, non genera nuovi dati
-                        generateNewData = false;
-                        try {
-                            baseValue = Double.parseDouble(lastDato.getValore());
-                        } catch (NumberFormatException e) {
-                            baseValue = min + (max - min) * random.nextDouble();
-                        }
-                    } else {
-                        generateNewData = true;
-                        try {
-                            baseValue = Double.parseDouble(lastDato.getValore());
-                        } catch (NumberFormatException e) {
-                            baseValue = min + (max - min) * random.nextDouble();
-                        }
-                    }
-                } else {
-                    generateNewData = true;
-                    baseValue = min + (max - min) * random.nextDouble();
-                }
-
-                DatoSensore datoToUse;
-                if (generateNewData) {
-                    // Calcola una variazione casuale compresa tra -maxDelta e +maxDelta
-                    double delta = -maxDelta + 2 * maxDelta * random.nextDouble();
-                    double newValue = baseValue + delta;
-                    // Clampa il nuovo valore nell'intervallo [min, max]
-                    newValue = Math.max(min, Math.min(newValue, max));
-
-                    DatoSensore newDato = new DatoSensore();
-                    newDato.setValore(String.valueOf((int)newValue)); // conversione a intero; modificare se necessario
-                    newDato.setTimestamp(now);
-                    newDato.setParametro(parametro);
-                    // Salva il nuovo dato nel DB (l'id verrà generato automaticamente)
-                    datoToUse = datoSensoreRepository.save(newDato);
-                } else {
-                    datoToUse = lastDato;
-                }
-
-                // Mappatura in DTO del dato sensore
-                SensorValueDTO sensorValueDTO = new SensorValueDTO();
-                sensorValueDTO.setValore(datoToUse.getValore());
-                sensorValueDTO.setTimestamp(datoToUse.getTimestamp());
-
-                List<SensorValueDTO> sensorValues = Collections.singletonList(sensorValueDTO);
-                paramData.put("parametro", parametroDTO);
-                paramData.put("valoriSensore", sensorValues);
-                parametriList.add(paramData);
-            }
-        }
+        List<ParametroRealtimeDTO> parametriList = simulateReadings
+                ? buildSimulatedRealtime(dispositivo)
+                : buildReadOnlyRealtime(dispositivo);
 
         // Costruisce la risposta finale
         Map<String, Object> response = new HashMap<>();
@@ -145,6 +85,126 @@ public class RealTimeController {
         response.put("user", userDTO);
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Ultimo valore per parametro così com'è nel DB (nessuna scrittura). I range gauge usano val_min/val_max se presenti,
+     * altrimenti default per unità; se il valore supera il massimo teorico, il massimo viene esteso leggermente.
+     */
+    private List<ParametroRealtimeDTO> buildReadOnlyRealtime(Dispositivo dispositivo) {
+        List<ParametroRealtimeDTO> parametriList = new ArrayList<>();
+        if (dispositivo.getParametriDispositivo() == null) {
+            return parametriList;
+        }
+        for (ParametroDispositivo parametro : dispositivo.getParametriDispositivo()) {
+            SensorGaugeDefaults.Range def = SensorGaugeDefaults.infer(
+                    parametro.getUnitaMisura(), parametro.getNome());
+            double min = parametro.getValMin() != null ? parametro.getValMin() : def.min();
+            double max = parametro.getValMax() != null ? parametro.getValMax() : def.max();
+            double maxDelta = parametro.getMaxDelta() != null ? parametro.getMaxDelta() : def.maxDelta();
+
+            DatoSensore lastDato = datoSensoreRepository.findFirstByParametroOrderByTimestampDesc(parametro);
+            // Se non esiste nessun campione per questo parametro, lasciamo valore/timestamp null:
+            // evita di mostrare "Misurato il: adesso" quando in realtà non ci sono dati.
+            String valore = lastDato != null ? lastDato.getValore() : null;
+            Instant ts = lastDato != null ? lastDato.getTimestamp() : null;
+
+            if (lastDato != null && lastDato.getValore() != null) {
+                try {
+                    double v = Double.parseDouble(lastDato.getValore().replace(",", ".").trim());
+                    if (v > max) {
+                        max = Math.max(v * 1.05, max);
+                    }
+                    if (v < min) {
+                        min = Math.min(v, min);
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
+            ParametroRealtimeDTO dto = new ParametroRealtimeDTO();
+            dto.setNome(parametro.getNome());
+            dto.setTipologia(parametro.getTipologia());
+            dto.setUnitaMisura(parametro.getUnitaMisura());
+            dto.setValMin(min);
+            dto.setValMax(max);
+            dto.setMaxDelta(maxDelta);
+            dto.setValore(valore);
+            dto.setTimestamp(ts);
+            parametriList.add(dto);
+        }
+        return parametriList;
+    }
+
+    /** Comportamento legacy: genera nuovi campioni casuali e li persiste (solo se {@code app.realtime.simulate-readings=true}). */
+    private List<ParametroRealtimeDTO> buildSimulatedRealtime(Dispositivo dispositivo) {
+        List<ParametroRealtimeDTO> parametriList = new ArrayList<>();
+        Random random = new Random();
+        if (dispositivo.getParametriDispositivo() == null) {
+            return parametriList;
+        }
+        for (ParametroDispositivo parametro : dispositivo.getParametriDispositivo()) {
+            SensorGaugeDefaults.Range def = SensorGaugeDefaults.infer(
+                    parametro.getUnitaMisura(), parametro.getNome());
+            double min = parametro.getValMin() != null ? parametro.getValMin() : def.min();
+            double max = parametro.getValMax() != null ? parametro.getValMax() : def.max();
+            double maxDelta = parametro.getMaxDelta() != null ? parametro.getMaxDelta() : def.maxDelta();
+            if (maxDelta <= 0 && max > min) {
+                maxDelta = (max - min) * 0.1;
+            }
+
+            Instant now = Instant.now();
+            DatoSensore lastDato = datoSensoreRepository.findFirstByParametroOrderByTimestampDesc(parametro);
+            boolean generateNewData = true;
+            double baseValue;
+
+            if (lastDato != null) {
+                Duration diff = Duration.between(lastDato.getTimestamp(), now);
+                if (diff.toMinutes() < 10) {
+                    generateNewData = false;
+                    try {
+                        baseValue = Double.parseDouble(lastDato.getValore().replace(",", ".").trim());
+                    } catch (NumberFormatException e) {
+                        baseValue = min + (max - min) * random.nextDouble();
+                    }
+                } else {
+                    try {
+                        baseValue = Double.parseDouble(lastDato.getValore().replace(",", ".").trim());
+                    } catch (NumberFormatException e) {
+                        baseValue = min + (max - min) * random.nextDouble();
+                    }
+                }
+            } else {
+                baseValue = min + (max - min) * random.nextDouble();
+            }
+
+            DatoSensore datoToUse;
+            if (generateNewData) {
+                double delta = -maxDelta + 2 * maxDelta * random.nextDouble();
+                double newValue = baseValue + delta;
+                newValue = Math.max(min, Math.min(newValue, max));
+
+                DatoSensore newDato = new DatoSensore();
+                newDato.setValore(String.valueOf(newValue));
+                newDato.setTimestamp(now);
+                newDato.setParametro(parametro);
+                datoToUse = datoSensoreRepository.save(newDato);
+            } else {
+                datoToUse = lastDato;
+            }
+
+            ParametroRealtimeDTO dto = new ParametroRealtimeDTO();
+            dto.setNome(parametro.getNome());
+            dto.setTipologia(parametro.getTipologia());
+            dto.setUnitaMisura(parametro.getUnitaMisura());
+            dto.setValMin(min);
+            dto.setValMax(max);
+            dto.setMaxDelta(maxDelta);
+            dto.setValore(datoToUse.getValore());
+            dto.setTimestamp(datoToUse.getTimestamp());
+            parametriList.add(dto);
+        }
+        return parametriList;
     }
 
     // ------------------- METODI DI MAPPING -------------------
@@ -178,11 +238,4 @@ public class RealTimeController {
         return dto;
     }
 
-    private ParametroDTO mapToParametroDTO(ParametroDispositivo parametro) {
-        ParametroDTO dto = new ParametroDTO();
-        dto.setNome(parametro.getNome());
-        dto.setTipologia(parametro.getTipologia());
-        dto.setUnitaMisura(parametro.getUnitaMisura());
-        return dto;
-    }
 }

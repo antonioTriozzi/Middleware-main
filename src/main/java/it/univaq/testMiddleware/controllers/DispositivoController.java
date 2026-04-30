@@ -170,6 +170,9 @@ public class DispositivoController {
         private String nome;
         private String tipologia;
         private String unitaMisura;
+        // KNX-only (opzionali)
+        private String groupAddress;
+        private String dpt;
         private Double valMin;
         private Double valMax;
         private Double maxDelta;
@@ -180,6 +183,10 @@ public class DispositivoController {
         public void setTipologia(String tipologia) { this.tipologia = tipologia; }
         public String getUnitaMisura() { return unitaMisura; }
         public void setUnitaMisura(String unitaMisura) { this.unitaMisura = unitaMisura; }
+        public String getGroupAddress() { return groupAddress; }
+        public void setGroupAddress(String groupAddress) { this.groupAddress = groupAddress; }
+        public String getDpt() { return dpt; }
+        public void setDpt(String dpt) { this.dpt = dpt; }
         public Double getValMin() { return valMin; }
         public void setValMin(Double valMin) { this.valMin = valMin; }
         public Double getValMax() { return valMax; }
@@ -241,6 +248,8 @@ public class DispositivoController {
                 p.setNome(pi.getNome());
                 p.setTipologia(pi.getTipologia());
                 p.setUnitaMisura(pi.getUnitaMisura());
+                p.setGroupAddress(pi.getGroupAddress());
+                p.setDpt(pi.getDpt());
                 p.setValMin(pi.getValMin());
                 p.setValMax(pi.getValMax());
                 p.setMaxDelta(pi.getMaxDelta());
@@ -297,6 +306,8 @@ public class DispositivoController {
                 nuovoParametro.setNome(paramDTO.getNome());
                 nuovoParametro.setTipologia(paramDTO.getTipologia());
                 nuovoParametro.setUnitaMisura(paramDTO.getUnitaMisura());
+                nuovoParametro.setGroupAddress(paramDTO.getGroupAddress());
+                nuovoParametro.setDpt(paramDTO.getDpt());
                 nuovoParametro.setValMin(paramDTO.getValMin());
                 nuovoParametro.setValMax(paramDTO.getValMax());
                 nuovoParametro.setMaxDelta(paramDTO.getMaxDelta());

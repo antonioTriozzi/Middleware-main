@@ -20,6 +20,23 @@ public class Dispositivo {
     @Column(name = "id_dispositivo")
     private Long idDispositivo;
 
+    /**
+     * Identificativo stringa del dispositivo lato gateway (es. SN-SE-12345678, MBUS-..., 00FA:...).
+     * Utile per riconciliare eventi tra protocolli diversi.
+     */
+    @Column(name = "external_device_id")
+    private String externalDeviceId;
+
+    /**
+     * Identificativo asset (numerico) lato dominio applicativo.
+     * Nel nuovo JSON consumi è il campo asset_id.
+     */
+    @Column(name = "asset_id")
+    private Long assetId;
+
+    @Column(name = "asset_name")
+    private String assetName;
+
     private String nome;
     private String marca;
     private String modello;
@@ -32,6 +49,12 @@ public class Dispositivo {
     @JoinColumn(name = "condominio_id")
     @JsonIgnoreProperties({"tokens"})
     private Condominio condominio;
+
+    // Proprietario (persona fisica) a cui attribuire dispositivo/consumi
+    @ManyToOne
+    @JoinColumn(name = "owner_user_id")
+    @JsonIgnoreProperties({"tokens"})
+    private User owner;
 
     // 1-N con ParametroDispositivo
     @OneToMany(mappedBy = "dispositivo", cascade = CascadeType.ALL)

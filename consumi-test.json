@@ -1,0 +1,24 @@
+[
+    {
+      "measure": "power",
+      "value": 4444,
+      "unit": "W",
+      "device_id": "SN-SE-12345678",
+      "building_id": 1,
+      "asset_id": 2,
+      "asset_name": "Generatore 1",
+      "client_id": 5,
+      "client_mail": "mario.rossi@example.com"
+    },
+    {
+      "measure": "active_energy",
+      "value": 10000,
+      "unit": "kWh",
+      "device_id": "SN-SE-12345678",
+      "building_id": 1,
+      "asset_id": 2,
+      "asset_name": "Generatore 1",
+      "client_id": 5,
+      "client_mail": "mario.rossi@example.com"
+    }
+  ]

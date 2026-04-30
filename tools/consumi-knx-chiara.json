@@ -1,0 +1,17 @@
+[
+  {
+    "measure": "scaling",
+    "value": 65,
+    "unit": "%",
+    "device_id": "00FA:00250000",
+    "building_id": 1,
+    "asset_id": 6,
+    "asset_name": "valvola_miscelatrice",
+    "client_id": 8,
+    "client_mail": "chiara.verdi@example.com",
+    "category": "Ambiente Clima",
+    "group_address": "1/1/1",
+    "dpt": "5.001",
+    "raw": "65"
+  }
+]

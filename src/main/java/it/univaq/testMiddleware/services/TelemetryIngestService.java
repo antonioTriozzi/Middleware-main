@@ -76,11 +76,11 @@ public class TelemetryIngestService {
             Instant ts = parseTimestamp(row.getTimestamp());
             List<TelemetryMeasurementItem> readings = row.getReadings() != null ? row.getReadings() : List.of();
             for (TelemetryMeasurementItem m : readings) {
-                if (m == null || m.getName() == null || m.getName().isBlank()) {
+                if (m == null || m.getMeasure() == null || m.getMeasure().isBlank()) {
                     continue;
                 }
                 ParametroDispositivo param = parametroDispositivoRepository
-                        .findByNomeAndDispositivo(m.getName().trim(), dispositivo)
+                        .findByNomeAndDispositivo(m.getMeasure().trim(), dispositivo)
                         .orElseGet(() -> createParametro(dispositivo, m));
 
                 DatoSensore dato = new DatoSensore();
@@ -97,10 +97,14 @@ public class TelemetryIngestService {
 
     private ParametroDispositivo createParametro(Dispositivo dispositivo, TelemetryMeasurementItem m) {
         ParametroDispositivo p = new ParametroDispositivo();
-        p.setNome(m.getName().trim());
+        p.setNome(m.getMeasure().trim());
         p.setTipologia("Telemetria gateway");
         p.setUnitaMisura(m.getUnit() != null ? m.getUnit() : "");
         p.setDispositivo(dispositivo);
+        SensorGaugeDefaults.Range rd = SensorGaugeDefaults.infer(m.getUnit(), m.getMeasure());
+        p.setValMin(rd.min());
+        p.setValMax(rd.max());
+        p.setMaxDelta(rd.maxDelta());
         return parametroDispositivoRepository.save(p);
     }
 

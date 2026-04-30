@@ -43,7 +43,30 @@ public class CondominioController {
         if (user == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Utente non trovato");
         }
-        List<Condominio> condomini = condominioRepository.findByAmministratore(user);
+        List<Condominio> condomini;
+        // Mobile: CLIENT deve vedere i "suoi" condomini (derivati da idCondominio o dai dispositivi owner)
+        if ("CLIENT".equalsIgnoreCase(user.getRuolo())) {
+            // Unione: il CLIENT può essere associato a un condominio "statico" (user.idCondominio)
+            // e/o risultare owner di dispositivi (derivati dall'ingest consumi).
+            Map<Long, Condominio> unique = new LinkedHashMap<>();
+
+            if (user.getIdCondominio() != null) {
+                condominioRepository.findById(user.getIdCondominio())
+                        .ifPresent(c -> unique.put(c.getIdCondominio(), c));
+            }
+
+            List<Condominio> byOwner = dispositivoRepository.findDistinctCondominiByOwnerId(user.getId());
+            for (Condominio c : byOwner) {
+                if (c != null && c.getIdCondominio() != null) {
+                    unique.putIfAbsent(c.getIdCondominio(), c);
+                }
+            }
+
+            condomini = new ArrayList<>(unique.values());
+        } else {
+            // ADMIN: condomini gestiti (amministratore)
+            condomini = condominioRepository.findByAmministratore(user);
+        }
         List<CondominioDTO> condominiDTO = condomini.stream().map(this::mapToCondominioDTOWithoutAdmin).collect(Collectors.toList());
 
         UserDTO userDTO = mapToUserDTO(user);
@@ -202,6 +225,10 @@ public class CondominioController {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
+        dto.setNome(user.getNome());
+        dto.setCognome(user.getCognome());
+        dto.setEmail(user.getEmail());
+        dto.setRuolo(user.getRuolo());
         return dto;
     }
 
@@ -249,11 +276,18 @@ public class CondominioController {
     private DispositivoDTO mapToDispositivoDTO(Dispositivo dispositivo) {
         DispositivoDTO dto = new DispositivoDTO();
         dto.setIdDispositivo(dispositivo.getIdDispositivo());
+        dto.setAssetId(dispositivo.getAssetId());
+        dto.setAssetName(dispositivo.getAssetName());
+        dto.setExternalDeviceId(dispositivo.getExternalDeviceId());
         dto.setNome(dispositivo.getNome());
         dto.setMarca(dispositivo.getMarca());
         dto.setModello(dispositivo.getModello());
         dto.setTipo(dispositivo.getTipo());
         dto.setStato(dispositivo.getStato());
+        if (dispositivo.getOwner() != null) {
+            dto.setOwnerUserId(dispositivo.getOwner().getId());
+            dto.setOwnerMail(dispositivo.getOwner().getEmail());
+        }
         // Per evitare un mapping ricorsivo, si può decidere di non mappare qui i parametri
         // oppure lasciarli vuoti e popolarli nel dettaglio specifico
         return dto;

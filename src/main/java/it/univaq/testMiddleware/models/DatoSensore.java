@@ -19,6 +19,10 @@ public class DatoSensore {
 
     private String valore;
 
+    // Campo opzionale (es. KNX raw). Manteniamo stringa per compatibilità.
+    @Column(name = "raw", length = 2000)
+    private String raw;
+
     @Column(name = "timestamp")
     private Instant timestamp;
     // Oppure LocalDateTime, a seconda di come preferisci gestire la data/ora
