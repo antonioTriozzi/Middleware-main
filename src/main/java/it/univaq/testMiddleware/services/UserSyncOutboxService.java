@@ -13,7 +13,7 @@ import java.util.Map;
 @Service
 public class UserSyncOutboxService {
 
-    /** Sync verso DB app web (creato da gateway, Android o OTP). */
+    /** Sync verso DB app web (es. OTP, registrazione, UserDataService). Non usato per utenti creati solo da ingest gateway. */
     public static final String EVENT_WEB_CLIENT_UPSERT = "WEB_CLIENT_UPSERT";
 
     private final UserSyncOutboxRepository outboxRepository;
@@ -48,7 +48,6 @@ public class UserSyncOutboxService {
         }
 
         UserSyncOutbox row = new UserSyncOutbox();
-        row.setUserId(user.getId());
         row.setEmail(email);
         row.setEventType(eventType != null && !eventType.isBlank() ? eventType : "UNKNOWN");
         row.setPayload(json);

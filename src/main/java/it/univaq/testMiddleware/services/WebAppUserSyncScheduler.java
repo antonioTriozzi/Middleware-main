@@ -48,7 +48,7 @@ public class WebAppUserSyncScheduler {
         this.objectMapper = objectMapper;
     }
 
-    /** Default 60s; stesso evento per utenti creati da gateway, Android o OTP. */
+    /** Default 60s; stesso evento per client da Android, OTP o API UserData (non da ingest gateway). */
     @Scheduled(fixedDelayString = "${app.web-sync.interval-ms:60000}")
     public void flushOutboxToWebApp() {
         if (!enabled) {
