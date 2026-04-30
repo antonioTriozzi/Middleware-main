@@ -32,13 +32,20 @@ public class AdminBootstrap implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        String normEmail = adminEmail == null ? "" : adminEmail.trim().toLowerCase();
+        if (normEmail.isBlank()) {
+            return;
+        }
         if (userRepository.existsByUsername(adminUsername)) {
+            return;
+        }
+        if (userRepository.existsByEmail(normEmail)) {
             return;
         }
 
         User u = new User();
         u.setUsername(adminUsername);
-        u.setEmail(adminEmail);
+        u.setEmail(normEmail);
         u.setRuolo("ADMIN");
         u.setNome("Admin");
         u.setCognome("");

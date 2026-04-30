@@ -16,6 +16,8 @@ public class UserDTO {
     private String ruolo;
     private String password;
 
+    /** Edificio (stesso ID usato nel gateway / tabella condomini). */
+    private Long idCondominio;
 
     // Campo calcolato: numero di condomini gestiti
     private int numeroCondominiGestiti;

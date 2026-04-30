@@ -21,10 +21,14 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final GatewayIngestTokenFilter gatewayIngestTokenFilter;
     private final UserService userService;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserService userService) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
+                          GatewayIngestTokenFilter gatewayIngestTokenFilter,
+                          UserService userService) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.gatewayIngestTokenFilter = gatewayIngestTokenFilter;
         this.userService = userService;
     }
 
@@ -50,8 +54,9 @@ public class SecurityConfig {
                             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Non autenticato o token non valido.");
                         })
                 )
-                // Inseriamo il nostro filtro custom prima di UsernamePasswordAuthenticationFilter
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                // JWT prima; poi eventuale X-Gateway-Ingest-Token per POST /api/consumi
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(gatewayIngestTokenFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

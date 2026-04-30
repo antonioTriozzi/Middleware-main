@@ -26,7 +26,8 @@ public class User {
     // Nuovi campi per il profilo utente
     private String nome;
     private String cognome;
-    @Column(unique = true)
+    // Univoca quando valorizzata (stessa mail da gateway, Android o web).
+    @Column(name = "email", unique = true, nullable = true, length = 320)
     private String email;
     private String numeroDiTelefono;
     private String ruolo;

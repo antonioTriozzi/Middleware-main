@@ -13,6 +13,9 @@ import java.util.Map;
 @Service
 public class UserSyncOutboxService {
 
+    /** Sync verso DB app web (creato da gateway, Android o OTP). */
+    public static final String EVENT_WEB_CLIENT_UPSERT = "WEB_CLIENT_UPSERT";
+
     private final UserSyncOutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
 

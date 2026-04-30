@@ -39,6 +39,9 @@ public class UserService implements UserDetailsService {
     }
 
     public User save(User user) {
+        if (user != null && user.getEmail() != null) {
+            user.setEmail(user.getEmail().trim().toLowerCase());
+        }
         return userRepository.save(user);
     }
 }

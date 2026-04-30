@@ -11,6 +11,7 @@ import it.univaq.testMiddleware.repositories.DatoSensoreRepository;
 import it.univaq.testMiddleware.repositories.DispositivoRepository;
 import it.univaq.testMiddleware.repositories.ParametroDispositivoRepository;
 import it.univaq.testMiddleware.repositories.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,17 +30,20 @@ public class ConsumiIngestService {
     private final ParametroDispositivoRepository parametroDispositivoRepository;
     private final DatoSensoreRepository datoSensoreRepository;
     private final UserRepository userRepository;
+    private final UserSyncOutboxService userSyncOutboxService;
 
     public ConsumiIngestService(CondominioRepository condominioRepository,
                                 DispositivoRepository dispositivoRepository,
                                 ParametroDispositivoRepository parametroDispositivoRepository,
                                 DatoSensoreRepository datoSensoreRepository,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                UserSyncOutboxService userSyncOutboxService) {
         this.condominioRepository = condominioRepository;
         this.dispositivoRepository = dispositivoRepository;
         this.parametroDispositivoRepository = parametroDispositivoRepository;
         this.datoSensoreRepository = datoSensoreRepository;
         this.userRepository = userRepository;
+        this.userSyncOutboxService = userSyncOutboxService;
     }
 
     @Transactional
@@ -143,7 +147,11 @@ public class ConsumiIngestService {
                 // Se non è valorizzato, aggancia il client al condominio del JSON
                 if (existing.getIdCondominio() == null && it.getBuildingId() != null) {
                     existing.setIdCondominio(it.getBuildingId());
-                    userRepository.save(existing);
+                    try {
+                        userRepository.save(existing);
+                    } catch (DataIntegrityViolationException ex) {
+                        warnings.add("Impossibile aggiornare idCondominio per email=" + email + ".");
+                    }
                 }
                 return Optional.of(existing);
             }
@@ -168,7 +176,17 @@ public class ConsumiIngestService {
                         if (u.getIdCondominio() == null && it.getBuildingId() != null) {
                             u.setIdCondominio(it.getBuildingId());
                         }
-                        userRepository.save(u);
+                        try {
+                            userRepository.save(u);
+                        } catch (DataIntegrityViolationException ex) {
+                            User canonical = userRepository.findByEmail(email).orElseThrow(() -> ex);
+                            if (canonical.getIdCondominio() == null && it.getBuildingId() != null) {
+                                canonical.setIdCondominio(it.getBuildingId());
+                                canonical = userRepository.save(canonical);
+                            }
+                            warnings.add("Unicità email: usato utente canonico per " + email + " (merge da username).");
+                            return Optional.of(canonical);
+                        }
                         warnings.add("Agganciato client_mail a utente esistente per username=" + baseUsername);
                         return Optional.of(u);
                     }
@@ -193,7 +211,17 @@ public class ConsumiIngestService {
                         if (u.getIdCondominio() == null && it.getBuildingId() != null) {
                             u.setIdCondominio(it.getBuildingId());
                         }
-                        userRepository.save(u);
+                        try {
+                            userRepository.save(u);
+                        } catch (DataIntegrityViolationException ex) {
+                            User canonical = userRepository.findByEmail(email).orElseThrow(() -> ex);
+                            if (canonical.getIdCondominio() == null && it.getBuildingId() != null) {
+                                canonical.setIdCondominio(it.getBuildingId());
+                                canonical = userRepository.save(canonical);
+                            }
+                            warnings.add("Unicità email: usato utente canonico per " + email + " (merge da client_id).");
+                            return Optional.of(canonical);
+                        }
                         warnings.add("Agganciato client_mail a utente esistente per client_id=" + it.getClientId());
                         return Optional.of(u);
                     }
@@ -224,8 +252,24 @@ public class ConsumiIngestService {
             // Mettiamo comunque un hash BCrypt per rispettare la logica di login esistente.
             u.setPassword(new BCryptPasswordEncoder().encode(UUID.randomUUID().toString()));
 
-            User saved = userRepository.save(u);
+            User saved;
+            try {
+                saved = userRepository.save(u);
+            } catch (DataIntegrityViolationException ex) {
+                saved = userRepository.findByEmail(email).orElseThrow(() -> ex);
+                warnings.add("Utente già presente per email (concorrenza o duplicato), riuso id=" + saved.getId() + ": " + email);
+                if (saved.getIdCondominio() == null && it.getBuildingId() != null) {
+                    saved.setIdCondominio(it.getBuildingId());
+                    saved = userRepository.save(saved);
+                }
+                return Optional.of(saved);
+            }
             warnings.add("Creato nuovo utente da client_mail: " + email + " (id=" + saved.getId() + ")");
+            try {
+                userSyncOutboxService.enqueue(saved, UserSyncOutboxService.EVENT_WEB_CLIENT_UPSERT);
+            } catch (Exception ignored) {
+                // non bloccare ingest consumi
+            }
             return Optional.of(saved);
         }
 

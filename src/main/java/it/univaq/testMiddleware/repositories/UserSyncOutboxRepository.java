@@ -9,5 +9,7 @@ import java.util.List;
 @Repository
 public interface UserSyncOutboxRepository extends JpaRepository<UserSyncOutbox, Long> {
     List<UserSyncOutbox> findTop200ByStatusOrderByIdAsc(String status);
+
+    List<UserSyncOutbox> findTop200ByStatusAndEventTypeOrderByIdAsc(String status, String eventType);
 }
 

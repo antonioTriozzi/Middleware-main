@@ -51,9 +51,19 @@ public class AuthController {
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
-    // Registrazione nuovo utente
+    // Registrazione: email obbligatoria e univoca (allineato ad app web / Android; niente utenti senza mail).
     @PostMapping("/register")
-    public Map<String, String> register(@RequestParam String username, @RequestParam String password) {
+    public Map<String, String> register(
+            @RequestParam String username,
+            @RequestParam String password,
+            @RequestParam String email) {
+        String normEmail = email == null ? "" : email.trim().toLowerCase();
+        if (normEmail.isBlank()) {
+            return Map.of("error", "Email obbligatoria");
+        }
+        if (userRepository.existsByEmail(normEmail)) {
+            return Map.of("error", "Email già registrata");
+        }
         if (userRepository.existsByUsername(username)) {
             return Map.of("error", "Username già in uso");
         }
@@ -61,6 +71,7 @@ public class AuthController {
         String encryptedPassword = passwordEncoder.encode(password);
         User user = new User();
         user.setUsername(username);
+        user.setEmail(normEmail);
         user.setPassword(encryptedPassword);
         userRepository.save(user);
 
@@ -146,7 +157,12 @@ public class AuthController {
                         existing.setRuolo("CLIENT");
                         createdOrPromoted = true;
                     }
-                    user = userRepository.save(existing);
+                    try {
+                        user = userRepository.save(existing);
+                    } catch (DataIntegrityViolationException e) {
+                        user = userRepository.findByEmail(normalized)
+                                .orElseThrow(() -> e);
+                    }
                 } else {
                     // username già occupato con email diversa: crea un nuovo utente con username univoco.
                     User u = new User();
@@ -191,7 +207,7 @@ public class AuthController {
         // Salva su outbox nel middleware (il consumer esterno potrà prelevarlo da qui).
         if (createdOrPromoted) {
             try {
-                userSyncOutboxService.enqueue(user, "OTP_VERIFY_UPSERT");
+                userSyncOutboxService.enqueue(user, UserSyncOutboxService.EVENT_WEB_CLIENT_UPSERT);
             } catch (Exception e) {
                 // Non bloccare OTP login per un errore di outbox.
                 log.warn("Outbox enqueue failed for email={}: {}", normalized, e.getMessage());
