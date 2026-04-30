@@ -20,11 +20,13 @@ public class User {
     @Column(name = "id_utente") // Se vuoi rispettare il nome della PK "id_utente" nel DB
     private Long id;
 
+    @Column(unique = true)
     private String username;
 
     // Nuovi campi per il profilo utente
     private String nome;
     private String cognome;
+    @Column(unique = true)
     private String email;
     private String numeroDiTelefono;
     private String ruolo;

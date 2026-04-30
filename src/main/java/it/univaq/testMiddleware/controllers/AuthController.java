@@ -12,6 +12,7 @@ import it.univaq.testMiddleware.services.UserSyncOutboxService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -156,7 +157,13 @@ public class AuthController {
                     String candidate = baseUsername + "_" + UUID.randomUUID().toString().substring(0, 8);
                     u.setUsername(candidate);
                     u.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-                    user = userRepository.save(u);
+                    try {
+                        user = userRepository.save(u);
+                    } catch (DataIntegrityViolationException e) {
+                        // In caso di richieste concorrenti: email/username potrebbero essere stati creati da un'altra richiesta.
+                        user = userRepository.findByEmail(normalized)
+                                .orElseThrow(() -> e);
+                    }
                     createdOrPromoted = true;
                 }
             } else {
@@ -171,7 +178,12 @@ public class AuthController {
                 }
                 u.setUsername(candidate);
                 u.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-                user = userRepository.save(u);
+                try {
+                    user = userRepository.save(u);
+                } catch (DataIntegrityViolationException e) {
+                    user = userRepository.findByEmail(normalized)
+                            .orElseThrow(() -> e);
+                }
                 createdOrPromoted = true;
             }
         }
