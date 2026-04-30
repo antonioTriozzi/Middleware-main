@@ -15,10 +15,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Spinge i nuovi client verso il DB dell'app web (batch periodico, outbox {@link UserSyncOutboxService#EVENT_WEB_CLIENT_UPSERT}).
@@ -48,9 +50,23 @@ public class WebAppUserSyncScheduler {
         this.objectMapper = objectMapper;
     }
 
-    /** Default 60s; stesso evento per client da Android, OTP o API UserData (non da ingest gateway). */
-    @Scheduled(fixedDelayString = "${app.web-sync.interval-ms:60000}")
-    public void flushOutboxToWebApp() {
+    /**
+     * Intervallo default 120s (2 min): compromesso tra latenza verso la web app e carico HTTP.
+     * Override: {@code app.web-sync.interval-ms}.
+     */
+    @Scheduled(fixedDelayString = "${app.web-sync.interval-ms:120000}")
+    public void flushOutboxToWebAppScheduled() {
+        syncPendingOutboxToWebApp();
+    }
+
+    /**
+     * Esegue subito lo stesso flusso del job (es. dopo {@code POST /api/integration/web-sync/flush}).
+     */
+    public void flushOutboxNow() {
+        syncPendingOutboxToWebApp();
+    }
+
+    private void syncPendingOutboxToWebApp() {
         if (!enabled) {
             return;
         }
@@ -75,6 +91,7 @@ public class WebAppUserSyncScheduler {
         }
 
         ArrayNode clients = objectMapper.createArrayNode();
+        Set<String> emailsSentInPayload = new HashSet<>();
         for (UserSyncOutbox row : batch.stream()
                 .filter(r -> {
                     String em = r.getEmail() != null ? r.getEmail().trim().toLowerCase() : "";
@@ -91,6 +108,10 @@ public class WebAppUserSyncScheduler {
                 item.set("cognome", payload.path("cognome"));
                 item.set("idCondominio", payload.path("idCondominio"));
                 clients.add(item);
+                String em = row.getEmail() != null ? row.getEmail().trim().toLowerCase() : "";
+                if (!em.isBlank()) {
+                    emailsSentInPayload.add(em);
+                }
             } catch (Exception e) {
                 log.warn("Outbox id={}: payload non valido: {}", row.getId(), e.getMessage());
             }
@@ -116,8 +137,11 @@ public class WebAppUserSyncScheduler {
                     .toBodilessEntity();
 
             for (UserSyncOutbox row : batch) {
-                row.setStatus("CONSUMED");
-                outboxRepository.save(row);
+                String em = row.getEmail() != null ? row.getEmail().trim().toLowerCase() : "";
+                if (!em.isBlank() && emailsSentInPayload.contains(em)) {
+                    row.setStatus("CONSUMED");
+                    outboxRepository.save(row);
+                }
             }
             log.info("Sync web app: inviati {} utenti verso {}", clients.size(), baseUrl);
         } catch (Exception e) {

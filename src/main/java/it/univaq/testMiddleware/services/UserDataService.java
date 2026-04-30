@@ -3,6 +3,8 @@ package it.univaq.testMiddleware.services;
 import it.univaq.testMiddleware.DTO.UserDTO;
 import it.univaq.testMiddleware.models.User;
 import it.univaq.testMiddleware.repositories.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,13 @@ import java.util.UUID;
 
 @Service
 public class UserDataService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserDataService.class);
+
+    /**
+     * Esito salvataggio: utente persistito e se è stato accodata la sync verso web (solo utenti nuovi per email).
+     */
+    public record UserSaveResult(User user, boolean willSyncToWeb) {}
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
@@ -27,9 +36,15 @@ public class UserDataService {
     }
 
     /**
-     * Upsert per email (evita doppioni). Accoda sync verso app web solo se è stato inserito un nuovo utente.
+     * Upsert per email (evita doppioni). Scrive sempre su tabella {@code user} del middleware.
+     * Accoda {@link UserSyncOutboxService#EVENT_WEB_CLIENT_UPSERT} solo se l'utente è appena stato creato
+     * (non esisteva già per quella email), così la web riceve il push una volta per nuovo client Android/userdata.
      */
     public User save(UserDTO userDTO) {
+        return saveWithResult(userDTO).user();
+    }
+
+    public UserSaveResult saveWithResult(UserDTO userDTO) {
         if (userDTO == null || !StringUtils.hasText(userDTO.getEmail())) {
             throw new IllegalArgumentException("Email obbligatoria");
         }
@@ -83,15 +98,16 @@ public class UserDataService {
         }
 
         user = userRepository.save(Objects.requireNonNull(user, "user"));
+        log.debug("User upsert committed: id={}, email={}, isNew={}", user.getId(), normalizedEmail, isNew);
 
         if (isNew) {
             try {
                 userSyncOutboxService.enqueue(Objects.requireNonNull(user, "user"), UserSyncOutboxService.EVENT_WEB_CLIENT_UPSERT);
-            } catch (Exception ignored) {
-                // non bloccare salvataggio
+            } catch (Exception e) {
+                log.warn("Outbox WEB_CLIENT_UPSERT non accodato per {}: {}", normalizedEmail, e.getMessage(), e);
             }
         }
-        return user;
+        return new UserSaveResult(user, isNew);
     }
 
     private static String deriveUsername(String normalizedEmail) {

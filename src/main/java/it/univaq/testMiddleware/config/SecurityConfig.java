@@ -42,7 +42,9 @@ public class SecurityConfig {
                                 "/auth/login",
                                 "/auth/register",
                                 "/auth/otp/request",
-                                "/auth/otp/verify"
+                                "/auth/otp/verify",
+                                "/api/mobile/v1/**",
+                                "/api/integration/web-sync/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

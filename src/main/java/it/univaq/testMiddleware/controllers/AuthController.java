@@ -73,7 +73,12 @@ public class AuthController {
         user.setUsername(username);
         user.setEmail(normEmail);
         user.setPassword(encryptedPassword);
-        userRepository.save(user);
+        User saved = userRepository.save(user);
+        try {
+            userSyncOutboxService.enqueue(saved, UserSyncOutboxService.EVENT_WEB_CLIENT_UPSERT);
+        } catch (Exception e) {
+            log.warn("Outbox enqueue dopo register fallita per email={}: {}", normEmail, e.getMessage());
+        }
 
         return Map.of("message", "Registrazione completata con successo");
     }
