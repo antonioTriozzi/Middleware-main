@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "name": "Middleware",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.import.maven.enabled": true,
+    "java.autobuild.enabled": true
+  }
+}

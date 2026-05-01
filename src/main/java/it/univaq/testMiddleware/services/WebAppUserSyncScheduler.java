@@ -9,7 +9,9 @@ import it.univaq.testMiddleware.repositories.UserSyncOutboxRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -44,6 +46,10 @@ public class WebAppUserSyncScheduler {
 
     @Value("${app.web-sync.secret:}")
     private String secret;
+
+    /** Opzionale: JWT admin dalla web ({@code POST /app/api/auth/login}) — stesso meccanismo delle altre API web. */
+    @Value("${app.web-sync.web-bearer-token:}")
+    private String webBearerToken;
 
     public WebAppUserSyncScheduler(UserSyncOutboxRepository outboxRepository, ObjectMapper objectMapper) {
         this.outboxRepository = outboxRepository;
@@ -128,11 +134,14 @@ public class WebAppUserSyncScheduler {
             String json = Objects.requireNonNull(objectMapper.writeValueAsString(body), "json");
             String syncToken = Objects.requireNonNull(secret, "secret");
             RestClient client = RestClient.builder().baseUrl(Objects.requireNonNull(baseUrl, "baseUrl")).build();
-            client.post()
+            var post = client.post()
                     .uri(Objects.requireNonNull(path, "path"))
                     .header("X-Middleware-Sync-Token", syncToken)
-                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
-                    .body(json)
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON));
+            if (StringUtils.hasText(webBearerToken)) {
+                post = post.header(HttpHeaders.AUTHORIZATION, "Bearer " + webBearerToken.trim());
+            }
+            post.body(json)
                     .retrieve()
                     .toBodilessEntity();
 

@@ -30,7 +30,7 @@ Uso:
   python simulate_middleware_to_web_client_upsert.py --also-direct-web
 
 Variabili d'ambiente:
-  WEB_APP_BASE_URL, MIDDLEWARE_SYNC_TOKEN, MIDDLEWARE_BASE_URL, MOBILE_API_TOKEN
+  WEB_APP_BASE_URL, MIDDLEWARE_SYNC_TOKEN, MIDDLEWARE_BASE_URL, MOBILE_API_TOKEN, WEB_API_BEARER_TOKEN
 """
 
 from __future__ import annotations
@@ -132,17 +132,22 @@ def post_mobile_user_sync(
         return -1, f"Connessione fallita ({middleware_base}): {e.reason}"
 
 
-def post_upsert(base_url: str, token: str, clients: list[dict]) -> tuple[int, str]:
+def post_upsert(
+    base_url: str, token: str, clients: list[dict], bearer_token: str | None = None
+) -> tuple[int, str]:
     url = base_url.rstrip("/") + "/app/api/integration/middleware/client-upsert"
     body = json.dumps({"clients": clients}, ensure_ascii=False).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Middleware-Sync-Token": token,
+    }
+    if bearer_token and bearer_token.strip():
+        headers["Authorization"] = "Bearer " + bearer_token.strip()
     req = urllib.request.Request(
         url,
         data=body,
         method="POST",
-        headers={
-            "Content-Type": "application/json; charset=utf-8",
-            "X-Middleware-Sync-Token": token,
-        },
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -192,9 +197,9 @@ def main() -> int:
         help="Header X-Mobile-Api-Token (app.mobile-api.secret sul middleware)",
     )
     p.add_argument(
-        "--also-direct-web",
-        action="store_true",
-        help="Dopo il middleware, invia anche un POST client-upsert diretto alla web (duplica l'ultimo step; solo test)",
+        "--web-bearer-token",
+        default=os.environ.get("WEB_API_BEARER_TOKEN", "").strip() or None,
+        help="Opzionale: Authorization Bearer (JWT admin /app/api/auth/login) oltre al sync token",
     )
     args = p.parse_args()
 
@@ -236,7 +241,9 @@ def main() -> int:
             print("    Abilita app.web-sync.enabled sul middleware e l'integrazione sulla web.")
             return 0
 
-    status, text = post_upsert(args.base_url, args.token, clients)
+    status, text = post_upsert(
+        args.base_url, args.token, clients, bearer_token=args.web_bearer_token
+    )
     label = (
         "--- Web app → client-upsert (POST diretto)"
         if not mw_base

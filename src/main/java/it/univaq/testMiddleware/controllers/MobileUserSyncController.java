@@ -5,10 +5,7 @@ import it.univaq.testMiddleware.services.UserDataService;
 import it.univaq.testMiddleware.services.WebAppUserSyncScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -19,7 +16,8 @@ import java.util.Map;
  * {@link WebAppUserSyncScheduler#flushOutboxNow()} (se {@code app.web-sync.enabled=true}) così la web
  * persiste il client senza attendere lo scheduler.
  * <p>
- * Autenticazione: header {@code X-Mobile-Api-Token} = {@code app.mobile-api.secret}.
+ * Autenticazione (filtro JWT): {@code X-Mobile-Api-Token} = {@code app.mobile-api.secret}
+ * oppure {@code Authorization: Bearer} con JWT middleware valido ({@code /auth/login}).
  */
 @RestController
 @RequestMapping("/api/mobile/v1")
@@ -29,9 +27,6 @@ public class MobileUserSyncController {
 
     private final UserDataService userDataService;
     private final WebAppUserSyncScheduler webAppUserSyncScheduler;
-
-    @Value("${app.mobile-api.secret:}")
-    private String mobileApiSecret;
 
     public MobileUserSyncController(UserDataService userDataService, WebAppUserSyncScheduler webAppUserSyncScheduler) {
         this.userDataService = userDataService;
@@ -50,17 +45,7 @@ public class MobileUserSyncController {
      * viene eseguito un flush outbox verso la web (stesso meccanismo dello scheduler).
      */
     @PostMapping("/users/sync")
-    public ResponseEntity<?> syncUser(
-            @RequestHeader(value = "X-Mobile-Api-Token", required = false) String token,
-            @RequestBody UserDTO body) {
-        if (!StringUtils.hasText(mobileApiSecret)) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("error", "app.mobile-api.secret non configurato sul middleware"));
-        }
-        if (!StringUtils.hasText(token) || !mobileApiSecret.equals(token.trim())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Token mancante o non valido (header X-Mobile-Api-Token)"));
-        }
+    public ResponseEntity<?> syncUser(@RequestBody UserDTO body) {
         try {
             UserDataService.UserSaveResult saveResult = userDataService.saveWithResult(body);
             var saved = saveResult.user();
