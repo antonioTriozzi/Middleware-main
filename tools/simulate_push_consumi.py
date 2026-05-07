@@ -2,7 +2,7 @@
 Simulazione "tempo reale": invia ripetutamente il batch consumi (JSON → POST /api/consumi).
 I valori vengono leggermente modificati a ogni ciclo così app e DB riflettono aggiornamenti periodici.
 
-Prima avvia Spring Boot. Usa credenziali ADMIN (stesso utente del bootstrap in application.properties).
+Default dev: middleware su server.port=8081 (vedi application.properties).
 """
 import json
 import random
@@ -50,7 +50,7 @@ def bump_value(item: dict) -> dict:
 
 
 def main():
-    base_url = "http://localhost:8080"
+    base_url = "http://localhost:8081"
     username = "admin"
     password = "AdminPass123!"
     interval_sec = 30

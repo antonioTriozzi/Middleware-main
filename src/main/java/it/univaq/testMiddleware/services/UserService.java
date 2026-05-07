@@ -7,6 +7,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -39,6 +40,18 @@ public class UserService implements UserDetailsService {
     }
 
     public User save(User user) {
+        Objects.requireNonNull(user, "user");
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            String normalized = user.getEmail().trim().toLowerCase();
+            user.setEmail(normalized);
+            Optional<User> byMail = userRepository.findByEmail(normalized);
+            if (byMail.isPresent()) {
+                User existing = byMail.get();
+                if (user.getId() == null || !existing.getId().equals(user.getId())) {
+                    return existing;
+                }
+            }
+        }
         return userRepository.save(user);
     }
 }

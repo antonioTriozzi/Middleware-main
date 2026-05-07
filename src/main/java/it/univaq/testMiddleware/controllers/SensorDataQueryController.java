@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @RestController
@@ -43,6 +44,7 @@ public class SensorDataQueryController {
             @PathVariable("deviceId") Long deviceId,
             @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
+        Objects.requireNonNull(deviceId, "deviceId");
         // Verifica che il dispositivo esista
         Optional<Dispositivo> deviceOpt = dispositivoRepository.findById(deviceId);
         if (deviceOpt.isEmpty()) {
@@ -77,7 +79,6 @@ public class SensorDataQueryController {
             parametroDTO.setNome(sample.getParametro().getNome());
             parametroDTO.setTipologia(sample.getParametro().getTipologia());
             parametroDTO.setUnitaMisura(sample.getParametro().getUnitaMisura());
-        
 
             // Mappa ogni DatoSensore in un SensorValueDTO
             List<SensorValueDTO> valori = datiParametro.stream().map(ds -> {
@@ -87,7 +88,7 @@ public class SensorDataQueryController {
                 return dto;
             }).collect(Collectors.toList());
 
-       //     parametroDTO.setValori(valori);
+            parametroDTO.setValori(valori);
             parametriDTO.add(parametroDTO);
         }
 

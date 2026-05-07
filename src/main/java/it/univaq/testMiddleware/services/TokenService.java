@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Objects;
 
 @Service
 public class TokenService {
@@ -44,8 +45,9 @@ public class TokenService {
     public void deleteToken(String token) {
         Optional<Token> opt = tokenRepository.findByToken(token);
         if (opt.isPresent()) {
-            System.out.println("Elimino il token dal DB: " + opt.get());
-            tokenRepository.delete(opt.get());
+            Token t = Objects.requireNonNull(opt.get(), "token");
+            System.out.println("Elimino il token dal DB: " + t);
+            tokenRepository.delete(t);
         } else {
             System.out.println("Nessun token corrispondente trovato in DB per: " + token);
         }

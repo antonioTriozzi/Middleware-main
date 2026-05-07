@@ -27,7 +27,6 @@ public class UserSyncOutbox {
      */
     @Column(nullable = false)
     private Long userId;
-
     @Column(nullable = false)
     private String email;
 

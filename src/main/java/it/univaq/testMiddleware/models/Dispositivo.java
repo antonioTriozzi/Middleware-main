@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"parametriDispositivo", "datiSensori", "storicoEventi"})
+@ToString(exclude = {"parametriDispositivo", "storicoEventi"})
 public class Dispositivo {
 
     @Id

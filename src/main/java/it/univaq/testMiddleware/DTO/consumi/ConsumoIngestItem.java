@@ -2,6 +2,7 @@ package it.univaq.testMiddleware.DTO.consumi;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,6 +19,7 @@ public class ConsumoIngestItem {
 
     private String measure;
 
+    @JsonDeserialize(using = ConsumoIngestDoubleDeserializer.class)
     private Double value;
 
     private String unit;

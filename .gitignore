@@ -27,3 +27,7 @@ replay_pid*
 /target/
 .idea/
 .DS_Store
+
+# Python caches (tools scripts)
+__pycache__/
+*.pyc

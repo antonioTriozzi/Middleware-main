@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 @Component
 public class DataArchivingScheduler {
@@ -50,11 +51,11 @@ public class DataArchivingScheduler {
                 .map(this::mapToStoricoDatoSensore)
                 .toList();
 
-        storicoDatoSensoreRepository.saveAll(archivedData);
+        storicoDatoSensoreRepository.saveAll(Objects.requireNonNull(archivedData, "archivedData"));
         logger.info("Archiviati con successo {} record nella tabella storico_dati_sensori.", archivedData.size());
 
         // 3. Cancella i dati da DatoSensore
-        datoSensoreRepository.deleteAll(oldData);
+        datoSensoreRepository.deleteAll(Objects.requireNonNull(oldData, "oldData"));
         logger.info("Cancellati con successo {} record dalla tabella dati_sensori.", oldData.size());
     }
 

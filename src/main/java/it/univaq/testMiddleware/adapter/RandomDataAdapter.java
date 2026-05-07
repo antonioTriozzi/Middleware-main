@@ -88,7 +88,9 @@ public class RandomDataAdapter implements ExternalDataAdapter {
                     datoToUse = lastDato;
                 }
 
-
+                if (datoToUse == null) {
+                    continue;
+                }
 
                 // Costruisci il DTO del dato sensore
                 SensorValueDTO sensorValueDTO = new SensorValueDTO();

@@ -5,7 +5,7 @@
 # Opzionale: .\push_once.ps1 -BaseUrl "http://192.168.1.10:8080"
 
 param(
-    [string] $BaseUrl = "http://localhost:8080",
+    [string] $BaseUrl = "http://localhost:8081",
     [string] $Username = "admin",
     [string] $Password = "AdminPass123!",
     [string] $JsonFile = ""

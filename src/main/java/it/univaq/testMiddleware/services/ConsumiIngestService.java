@@ -11,14 +11,18 @@ import it.univaq.testMiddleware.repositories.DatoSensoreRepository;
 import it.univaq.testMiddleware.repositories.DispositivoRepository;
 import it.univaq.testMiddleware.repositories.ParametroDispositivoRepository;
 import it.univaq.testMiddleware.repositories.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -44,12 +48,15 @@ public class ConsumiIngestService {
 
     @Transactional
     public IngestSummary ingest(List<ConsumoIngestItem> items) {
-        if (items == null || items.isEmpty()) {
-            throw new IllegalArgumentException("Body vuoto: atteso array di misure.");
+        if (items == null) {
+            throw new IllegalArgumentException("Body assente: atteso array JSON di misure.");
+        }
+        if (items.isEmpty()) {
+            return new IngestSummary(0, new ArrayList<>());
         }
 
         int saved = 0;
-        List<String> warnings = new ArrayList<>();
+        Collection<String> warnings = new LinkedHashSet<>();
 
         for (ConsumoIngestItem it : items) {
             if (it == null) continue;
@@ -65,8 +72,12 @@ public class ConsumiIngestService {
                 warnings.add("Riga senza measure ignorata.");
                 continue;
             }
+            if (it.getValue() == null) {
+                warnings.add("Riga con valore misura null ignorata.");
+                continue;
+            }
 
-            Condominio condominio = condominioRepository.findById(it.getBuildingId())
+            Condominio condominio = condominioRepository.findById(Objects.requireNonNull(it.getBuildingId(), "buildingId"))
                     .orElseGet(() -> createCondominioFromJson(it, warnings));
             enrichCondominioFromJson(condominio, it);
 
@@ -81,13 +92,13 @@ public class ConsumiIngestService {
             DatoSensore dato = new DatoSensore();
             dato.setParametro(parametro);
             dato.setTimestamp(Instant.now());
-            dato.setValore(it.getValue() == null ? "" : String.valueOf(it.getValue()));
+            dato.setValore(String.valueOf(it.getValue()));
             dato.setRaw(it.getRaw());
             datoSensoreRepository.save(dato);
             saved++;
         }
 
-        return new IngestSummary(saved, warnings);
+        return new IngestSummary(saved, new ArrayList<>(warnings));
     }
 
     private void enrichCondominioFromJson(Condominio c, ConsumoIngestItem it) {
@@ -106,7 +117,7 @@ public class ConsumiIngestService {
         }
     }
 
-    private Condominio createCondominioFromJson(ConsumoIngestItem it, List<String> warnings) {
+    private Condominio createCondominioFromJson(ConsumoIngestItem it, Collection<String> warnings) {
         // Obiettivo: rendere il flusso "self-contained": se arriva un building_id che non esiste,
         // creiamo un condominio minimo (nome/indirizzo default) usando quello stesso id.
         Condominio c = new Condominio();
@@ -129,21 +140,21 @@ public class ConsumiIngestService {
         return saved;
     }
 
-    private Optional<User> resolveOwner(ConsumoIngestItem it, List<String> warnings) {
-        // Regola: client_mail è la sorgente di verità (stabile). client_id può non corrispondere al DB locale.
+    private Optional<User> resolveOwner(ConsumoIngestItem it, Collection<String> warnings) {
+        // Chiave owner: solo client_mail (univoca nel middleware). client_id nel JSON è dell'app web e viene ignorato.
         String email = it.getClientMail() != null ? it.getClientMail().trim().toLowerCase() : "";
         if (!email.isBlank()) {
             Optional<User> byMail = userRepository.findByEmail(email);
             if (byMail.isPresent()) {
                 User existing = byMail.get();
-                // Se arriva anche client_id ma punta ad un altro utente, segnala (ma NON usare quel client_id).
-                if (it.getClientId() != null && !existing.getId().equals(it.getClientId())) {
-                    warnings.add("client_id (" + it.getClientId() + ") non coerente con client_mail (" + email + "). Usata email come chiave.");
-                }
-                // Se non è valorizzato, aggancia il client al condominio del JSON
+                // Owner = utente con questa email (univoca). client_id nel JSON gateway non si usa.
                 if (existing.getIdCondominio() == null && it.getBuildingId() != null) {
                     existing.setIdCondominio(it.getBuildingId());
-                    userRepository.save(existing);
+                    try {
+                        userRepository.save(existing);
+                    } catch (DataIntegrityViolationException ex) {
+                        warnings.add("Impossibile aggiornare idCondominio per email=" + email + ".");
+                    }
                 }
                 return Optional.of(existing);
             }
@@ -168,7 +179,17 @@ public class ConsumiIngestService {
                         if (u.getIdCondominio() == null && it.getBuildingId() != null) {
                             u.setIdCondominio(it.getBuildingId());
                         }
-                        userRepository.save(u);
+                        try {
+                            userRepository.save(u);
+                        } catch (DataIntegrityViolationException ex) {
+                            User canonical = userRepository.findByEmail(email).orElseThrow(() -> ex);
+                            if (canonical.getIdCondominio() == null && it.getBuildingId() != null) {
+                                canonical.setIdCondominio(it.getBuildingId());
+                                canonical = userRepository.save(canonical);
+                            }
+                            warnings.add("Unicità email: usato utente canonico per " + email + " (merge da username).");
+                            return Optional.of(canonical);
+                        }
                         warnings.add("Agganciato client_mail a utente esistente per username=" + baseUsername);
                         return Optional.of(u);
                     }
@@ -176,30 +197,7 @@ public class ConsumiIngestService {
                 }
             }
 
-            // Se non esiste per email, prova a usare client_id SOLO se presente e compatibile:
-            // - se l'utente esiste e non ha email o ha la stessa email, lo normalizziamo.
-            if (it.getClientId() != null) {
-                Optional<User> byId = userRepository.findById(it.getClientId());
-                if (byId.isPresent()) {
-                    User u = byId.get();
-                    String existingEmail = u.getEmail() != null ? u.getEmail().trim().toLowerCase() : "";
-                    if (existingEmail.isBlank() || existingEmail.equals(email)) {
-                        if (existingEmail.isBlank()) {
-                            u.setEmail(email);
-                        }
-                        if (u.getRuolo() == null || u.getRuolo().isBlank()) {
-                            u.setRuolo("CLIENT");
-                        }
-                        if (u.getIdCondominio() == null && it.getBuildingId() != null) {
-                            u.setIdCondominio(it.getBuildingId());
-                        }
-                        userRepository.save(u);
-                        warnings.add("Agganciato client_mail a utente esistente per client_id=" + it.getClientId());
-                        return Optional.of(u);
-                    }
-                    warnings.add("client_id (" + it.getClientId() + ") appartiene a email diversa (" + existingEmail + "). Ignorato client_id.");
-                }
-            }
+            // client_id nel JSON gateway è solo l'id nell'app web: non usato qui per risolvere l'owner.
 
             // Crea l'utente UNA volta (id univoco DB), derivando username dall'email
             User u = new User();
@@ -224,20 +222,24 @@ public class ConsumiIngestService {
             // Mettiamo comunque un hash BCrypt per rispettare la logica di login esistente.
             u.setPassword(new BCryptPasswordEncoder().encode(UUID.randomUUID().toString()));
 
-            User saved = userRepository.save(u);
+            User saved;
+            try {
+                saved = userRepository.save(u);
+            } catch (DataIntegrityViolationException ex) {
+                saved = userRepository.findByEmail(email).orElseThrow(() -> ex);
+                warnings.add("Utente già presente per email (concorrenza o duplicato), riuso id=" + saved.getId() + ": " + email);
+                if (saved.getIdCondominio() == null && it.getBuildingId() != null) {
+                    saved.setIdCondominio(it.getBuildingId());
+                    saved = userRepository.save(saved);
+                }
+                return Optional.of(saved);
+            }
             warnings.add("Creato nuovo utente da client_mail: " + email + " (id=" + saved.getId() + ")");
+            // Nessun accodamento verso user_sync_outbox: l'outbox è solo per sync verso app web da altri flussi (non gateway).
             return Optional.of(saved);
         }
 
-        // Fallback: se manca email ma c'è client_id, usa quello
-        if (it.getClientId() != null) {
-            Optional<User> byId = userRepository.findById(it.getClientId());
-            if (byId.isPresent()) {
-                return byId;
-            }
-        }
-
-        warnings.add("Riga senza client_id/client_mail: dispositivo non verrà attribuito a un owner.");
+        warnings.add("Riga senza client_mail: dispositivo non verrà attribuito a un owner (client_id dal gateway ignorato).");
         return Optional.empty();
     }
 
@@ -247,7 +249,7 @@ public class ConsumiIngestService {
                 ? dispositivoRepository.findByAssetIdAndCondominio_IdCondominio(it.getAssetId(), condominio.getIdCondominio())
                 : Optional.empty();
         if (byAsset.isPresent()) {
-            Dispositivo d = byAsset.get();
+            Dispositivo d = Objects.requireNonNull(byAsset.get(), "dispositivo");
             updateDeviceFields(d, it, owner);
             return dispositivoRepository.save(d);
         }
@@ -256,7 +258,7 @@ public class ConsumiIngestService {
         if (it.getDeviceId() != null && !it.getDeviceId().isBlank()) {
             Optional<Dispositivo> byExt = dispositivoRepository.findByExternalDeviceIdAndCondominio_IdCondominio(it.getDeviceId().trim(), condominio.getIdCondominio());
             if (byExt.isPresent()) {
-                Dispositivo d = byExt.get();
+                Dispositivo d = Objects.requireNonNull(byExt.get(), "dispositivo");
                 updateDeviceFields(d, it, owner);
                 return dispositivoRepository.save(d);
             }

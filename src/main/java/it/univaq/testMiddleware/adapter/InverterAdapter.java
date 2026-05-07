@@ -68,13 +68,18 @@ public class InverterAdapter implements ExternalDataAdapter {
 
     @Transactional
     @Override
+    @SuppressWarnings("unchecked")
     public ExternalDataResponse fetchAndMapData(Condominio condominio, Dispositivo dispositivo, User user) {
 
-        String url = "http://localhost:8081/api/inverter/" + dispositivo.getIdDispositivo();
+        Long idDispositivo = dispositivo.getIdDispositivo();
+        if (idDispositivo == null) {
+            return null;
+        }
+        String url = "http://localhost:8081/api/inverter/" + idDispositivo;
         Map<String, Object> datiApi = restTemplate.getForObject(url, Map.class);
         if (datiApi == null) return null;
 
-        Dispositivo existingDispositivo = dispositivoRepository.findById(dispositivo.getIdDispositivo())
+        Dispositivo existingDispositivo = dispositivoRepository.findById(idDispositivo)
                 .orElse(dispositivoRepository.save(dispositivo));
 
         List<Map<String, Object>> paramList = new ArrayList<>();

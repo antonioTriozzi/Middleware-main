@@ -10,6 +10,5 @@ public class ParametroDTO {
     private String nome;
     private String tipologia;
     private String unitaMisura;
-    //private List<SensorValueDTO> valori;  // I dati sensore per questo parametro
-
+    private List<SensorValueDTO> valori;
 }
