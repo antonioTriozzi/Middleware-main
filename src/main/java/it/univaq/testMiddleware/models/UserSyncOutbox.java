@@ -19,6 +19,9 @@ public class UserSyncOutbox {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(nullable = false)
+    private Instant updatedAt = Instant.now();
+
     /**
      * Identificatore stabile lato middleware.
      */
@@ -46,5 +49,35 @@ public class UserSyncOutbox {
      */
     @Column(nullable = false)
     private String status = "PENDING";
+
+    /**
+     * Stato per retry automatico verso l'app web: PENDING / SENT / ERROR.
+     * Separato da {@link #status} per non interferire con il consumer esterno.
+     */
+    @Column(nullable = false)
+    private String webStatus = "PENDING";
+
+    @Column(nullable = false)
+    private int webAttempts = 0;
+
+    private Instant webLastAttemptAt;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String webLastError;
+
+    private Instant webSentAt;
+
+    @PrePersist
+    void prePersist() {
+        Instant now = Instant.now();
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        updatedAt = Instant.now();
+    }
 }
 

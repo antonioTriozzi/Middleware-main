@@ -1,5 +1,6 @@
 package it.univaq.testMiddleware.controllers;
 
+import it.univaq.testMiddleware.DTO.ProfileUpdateDTO;
 import it.univaq.testMiddleware.DTO.UserDTO;
 import it.univaq.testMiddleware.models.Dispositivo;
 import it.univaq.testMiddleware.models.User;
@@ -9,6 +10,7 @@ import it.univaq.testMiddleware.services.JwtService;
 import it.univaq.testMiddleware.services.OtpService;
 import it.univaq.testMiddleware.services.TokenService;
 import it.univaq.testMiddleware.services.UserSyncOutboxService;
+import it.univaq.testMiddleware.services.WebAppUserSyncService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +20,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +39,7 @@ public class AuthController {
     private final TokenService tokenService;
     private final OtpService otpService;
     private final UserSyncOutboxService userSyncOutboxService;
+    private final WebAppUserSyncService webAppUserSyncService;
     private final BCryptPasswordEncoder passwordEncoder;
 
     public AuthController(UserRepository userRepository,
@@ -41,13 +47,15 @@ public class AuthController {
                           JwtService jwtService,
                           TokenService tokenService,
                           OtpService otpService,
-                          UserSyncOutboxService userSyncOutboxService) {
+                          UserSyncOutboxService userSyncOutboxService,
+                          WebAppUserSyncService webAppUserSyncService) {
         this.userRepository = userRepository;
         this.dispositivoRepository = dispositivoRepository;
         this.jwtService = jwtService;
         this.tokenService = tokenService;
         this.otpService = otpService;
         this.userSyncOutboxService = userSyncOutboxService;
+        this.webAppUserSyncService = webAppUserSyncService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
@@ -196,6 +204,11 @@ public class AuthController {
                 // Non bloccare OTP login per un errore di outbox.
                 log.warn("Outbox enqueue failed for email={}: {}", normalized, e.getMessage());
             }
+            try {
+                webAppUserSyncService.pushClientUpsert(user);
+            } catch (Exception e) {
+                log.warn("Web app sync failed for email={}: {}", normalized, e.getMessage());
+            }
         }
 
         // Riallineamento: se in passato sono stati creati utenti duplicati, possono esistere dispositivi
@@ -262,8 +275,91 @@ public class AuthController {
         dto.setCognome(user.getCognome());
         dto.setEmail(user.getEmail());
         dto.setRuolo(user.getRuolo());
+        dto.setNumeroDiTelefono(user.getNumeroDiTelefono());
+        dto.setDataNascita(user.getDataNascita());
         dto.setNumeroCondominiGestiti(user.getCondominiGestiti() != null ? user.getCondominiGestiti().size() : 0);
         System.out.println(dto);
+        return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Aggiorna anagrafica (nome, cognome, telefono, data di nascita). Email/username non modificabili da qui.
+     */
+    @PatchMapping("/profile")
+    @Transactional
+    public ResponseEntity<UserDTO> patchProfile(@RequestHeader("Authorization") String authHeader,
+                                                 @RequestBody ProfileUpdateDTO body) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String token = authHeader.substring(7);
+        if (tokenService.findValidToken(token).isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (body == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String username = jwtService.extractUsername(token);
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        User user = userOpt.get();
+
+        boolean changed = false;
+        if (body.getNome() != null) {
+            user.setNome(body.getNome().trim());
+            changed = true;
+        }
+        if (body.getCognome() != null) {
+            user.setCognome(body.getCognome().trim());
+            changed = true;
+        }
+        if (body.getNumeroDiTelefono() != null) {
+            user.setNumeroDiTelefono(body.getNumeroDiTelefono().trim());
+            changed = true;
+        }
+        if (body.getDataNascita() != null) {
+            String raw = body.getDataNascita().trim();
+            if (raw.isEmpty()) {
+                user.setDataNascita(null);
+                changed = true;
+            } else {
+                try {
+                    LocalDate ld = LocalDate.parse(raw);
+                    user.setDataNascita(Date.from(ld.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    changed = true;
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
+        }
+
+        if (changed) {
+            user = userRepository.save(user);
+            try {
+                userSyncOutboxService.enqueue(user, "PROFILE_UPDATE");
+            } catch (Exception e) {
+                log.warn("Outbox enqueue failed after profile patch for user {}: {}", username, e.getMessage());
+            }
+            try {
+                webAppUserSyncService.pushClientUpsert(user);
+            } catch (Exception e) {
+                log.warn("Web app sync failed after profile patch for {}: {}", username, e.getMessage());
+            }
+        }
+
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setNome(user.getNome());
+        dto.setCognome(user.getCognome());
+        dto.setEmail(user.getEmail());
+        dto.setNumeroDiTelefono(user.getNumeroDiTelefono());
+        dto.setDataNascita(user.getDataNascita());
+        dto.setRuolo(user.getRuolo());
+        dto.setNumeroCondominiGestiti(user.getCondominiGestiti() != null ? user.getCondominiGestiti().size() : 0);
         return ResponseEntity.ok(dto);
     }
 }

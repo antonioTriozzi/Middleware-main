@@ -7,6 +7,9 @@ import it.univaq.testMiddleware.models.UserSyncOutbox;
 import it.univaq.testMiddleware.repositories.UserSyncOutboxRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -33,6 +36,12 @@ public class UserSyncOutboxService {
         payload.put("cognome", user.getCognome());
         payload.put("email", email);
         payload.put("numeroDiTelefono", user.getNumeroDiTelefono());
+        if (user.getDataNascita() != null) {
+            LocalDate ld = Instant.ofEpochMilli(user.getDataNascita().getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
+            payload.put("dataNascita", ld.toString());
+        } else {
+            payload.put("dataNascita", null);
+        }
         payload.put("ruolo", user.getRuolo());
         payload.put("idCondominio", user.getIdCondominio());
 
@@ -50,6 +59,7 @@ public class UserSyncOutboxService {
         row.setEventType(eventType != null && !eventType.isBlank() ? eventType : "UNKNOWN");
         row.setPayload(json);
         row.setStatus("PENDING");
+        row.setWebStatus("PENDING");
         outboxRepository.save(row);
     }
 }

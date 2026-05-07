@@ -1,6 +1,7 @@
 package it.univaq.testMiddleware.DTO;
 
 import lombok.Data;
+
 import java.util.Date;
 
 // DTO per l'utente (amministratore)
@@ -13,6 +14,8 @@ public class UserDTO {
     private String nome;
     private String cognome;
     private String email;
+    private String numeroDiTelefono;
+    private Date dataNascita;
     private String ruolo;
     private String password;
 
